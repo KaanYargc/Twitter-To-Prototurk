@@ -1,0 +1,25 @@
+[
+  {
+    "twitterUsername": "kilicdarogluk",
+    "prototurkUsername": "",
+    "prototurkSession": "",
+    "prototurkCsrf": "",
+    "email": "",
+    "password": "",
+    "isPolitical": true,
+    "enabled": false,
+    "createdAt": "2026-05-23T21:00:00.000Z",
+    "note": "Politik hesap - devre dışı"
+  },
+  {
+    "twitterUsername": "takvim",
+    "prototurkUsername": "takvim",
+    "prototurkSession": "9h3dmqcV2BM4VgWePVnsYUH4aI7meSs_Y7n6FT-YOa8",
+    "prototurkCsrf": "ksx_ilIk8BKBHXKS87faRJR9W3DYfSFs9lO0-UmH-5s",
+    "email": "takvim_67383@outlook.com",
+    "password": "7SC#%*TynI%4t^s#3^bC",
+    "isPolitical": false,
+    "enabled": true,
+    "createdAt": "2026-05-23T21:47:35.349Z"
+  }
+]

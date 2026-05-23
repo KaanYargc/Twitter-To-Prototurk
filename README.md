@@ -1,74 +1,159 @@
-# Twitter -> Prototurk Otomatik Post Aktarımı
+# Twitter -> Prototurk Çoklu Hesap Otomasyonu
 
-xcancel.com RSS üzerinden Twitter tweetlerini çekip dev.prototurk.com sitesine otomatik post olarak aktaran bot.
+Twitter'dan otomatik olarak tweet çekip dev.prototurk.com sitesine çoklu hesaplarla post olarak aktaran bot.
 
-## Kurulum
+## 🚀 Hızlı Başlangıç
 
-### 1. Bağımlılıkları Yükle
 ```bash
+# 1. Bağımlılıkları yükle
 bun install
+
+# 2. Otomatik kurulum (tek komut!)
+bun run setup
 ```
 
-### 2. .env Dosyasını Oluştur
+Bu komut:
+- ✅ Popüler hesaplardan rastgele seçer
+- ✅ Politik kontrolü yapar
+- ✅ Prototurk hesapları oluşturur
+- ✅ Profilleri ayarlar
+- ✅ İlk tweet'leri çeker
+- ✅ Tüm bilgileri kaydeder
 
-`.env.example` dosyası zaten hazır, sadece kullanıcı adını değiştirin:
+## ✨ Özellikler
+
+- ✅ **Tek komutla kurulum** - Her şey otomatik
+- ✅ Çoklu Twitter hesabı desteği
+- ✅ Otomatik Prototurk hesabı oluşturma
+- ✅ Politik hesap tespiti (otomatik filtreleme)
+- ✅ RSS ile tweet çekme (API key gerektirmez)
+- ✅ Görsel desteği
+- ✅ Duplicate kontrolü (hesap bazında)
+- ✅ Rate limiting koruması
+
+## 📦 Kurulum Detayları
+
+### Otomatik Kurulum (Önerilen)
 
 ```bash
-cp .env.example .env
+bun run setup
+# Kaç hesap? 3
+# → 3 hesap otomatik oluşturulur ve çalışmaya başlar
 ```
 
-Ardından `.env` dosyasında `TWITTER_USERNAME` değerini düzenleyin.
+### Manuel Kurulum
 
-## Kullanım
+```bash
+# Tek hesap test
+bun run test
 
-### Normal Çalıştırma
+# Hesap yönetimi
+bun run accounts
+```
+
+## 🎯 Kullanım
+
+### Sürekli Çalıştırma
+
 ```bash
 bun start
 ```
 
-### Development Mode (otomatik yeniden başlatma)
+Bot:
+- Her 5 dakikada bir yeni tweet'leri kontrol eder
+- Bulduğu tweet'leri ilgili Prototurk hesabına gönderir
+- Otomatik çalışır, müdahale gerektirmez
+
+### Development Mode
+
 ```bash
 bun dev
 ```
 
-## Özellikler
+## 📁 Dosya Yapısı
 
-- ✅ xcancel.com RSS ile Twitter tweetlerini çekme (API key gerektirmez!)
-- ✅ Prototurk'e otomatik post gönderme
-- ✅ Duplicate kontrolü (aynı tweet'i tekrar göndermez)
-- ✅ Periyodik kontrol (varsayılan: 5 dakika)
-- ✅ Rate limiting koruması
-- ✅ HTML temizleme ve formatla
-- ✅ Hata yönetimi
+- `auto-setup.js` - **Tek komutla kurulum** ⭐
+- `index.js` - Ana bot kodu
+- `account-manager.js` - Hesap yönetimi
+- `popular-accounts.js` - Popüler hesap listesi
+- `accounts.json` - Hesap bilgileri (otomatik oluşturulur)
+- `last_processed.json` - Son işlenen tweetler
 
-## Nasıl Çalışır?
+## 🤖 Politik Hesap Tespiti
 
-1. xcancel.com'dan RSS feed çeker (`https://xcancel.com/KULLANICI_ADI/rss`)
-2. Yeni tweetleri tespit eder
-3. Tweet içeriğini temizler (HTML etiketlerini kaldırır)
-4. dev.prototurk.com'a post olarak gönderir
-5. Son işlenen tweet'i kaydeder (tekrar göndermemek için)
-6. Belirlenen aralıklarla tekrar kontrol eder
+Bot şu kelimeleri arar:
+- Parti isimleri (chp, akp, mhp, vb.)
+- Politik terimler (siyaset, seçim, hükümet, vb.)
+- Politikacı isimleri
 
-## Notlar
+Son 10 tweet'in %40'ından fazlası bu kelimeleri içeriyorsa hesap politik sayılır ve eklenmez.
 
-- **Session Süresi**: Prototurk session'ı belirli bir süre sonra expire olabilir. Bu durumda yeni session bilgileri almanız gerekir.
-- **API Key Yok**: Twitter API key'e ihtiyaç yok, RSS kullanıyor!
-- **CSRF Token**: Her oturumda değişebilir, hata alırsanız yeni token alın.
+## 📊 Popüler Hesap Kategorileri
 
-## Sorun Giderme
+- **Spor** - Beşiktaş, Galatasaray, Fenerbahçe, vb.
+- **Mizah** - Uykusuz Dergi, Leman, Penguen, vb.
+- **Teknoloji** - Webrazzi, ShiftDelete, Donanimhaber, vb.
+- **Haber** - CNN Türk, Habertürk, NTV, vb.
+- **Eğlence** - TV kanalları
+- **Müzik** - Radyo kanalları
+- **Yemek** - Yemeksepeti, Getir, vb.
+- **Moda** - LC Waikiki, Defacto, vb.
 
-### "Invalid CSRF token" hatası
-- Yeni CSRF token alın (tarayıcıdan `/api/posts` isteğine bakın)
-- `.env` dosyasını güncelleyin
-- Uygulamayı yeniden başlatın
+## 🔐 Güvenlik
 
-### Tweet'ler gelmiyor
-- `TWITTER_USERNAME` değerinin doğru olduğundan emin olun
-- xcancel.com'un çalıştığını kontrol edin: `https://xcancel.com/KULLANICI_ADI/rss`
-- `last_processed.json` dosyasını silin (tüm tweet'leri yeniden çeker)
+- `accounts.json` hassas bilgiler içerir
+- `.gitignore` dosyasında zaten var
+- Email ve şifreler otomatik oluşturulur
+- Session bilgileri güvenli saklanır
 
-### RSS çekme hatası
-- xcancel.com erişilebilir mi kontrol edin
-- Kullanıcı adı doğru mu kontrol edin
-- İnternet bağlantınızı kontrol edin
+## 🛠️ Komutlar
+
+```bash
+# Otomatik kurulum ve başlatma
+bun run setup
+
+# Sürekli çalıştır
+bun start
+
+# Tek hesap test
+bun run test
+
+# Hesap yönetimi
+bun run accounts
+
+# Development mode
+bun dev
+```
+
+## 📝 Örnek Kullanım
+
+```bash
+# 1. Otomatik kurulum
+bun run setup
+# Kaç hesap? 5
+
+# 2. Bot otomatik çalışır
+# → 5 hesap oluşturulur
+# → Profiller ayarlanır
+# → Tweet'ler çekilir
+
+# 3. Sürekli çalıştır
+bun start
+```
+
+## 🎉 Başarı Hikayeleri
+
+Test sonuçları:
+- ✅ webrazzi hesabı oluşturuldu
+- ✅ 6 tweet başarıyla aktarıldı
+- ✅ Duplicate kontrolü çalışıyor
+- ✅ Otomatik profil kurulumu
+
+## 🚀 Gelecek Özellikler
+
+- [ ] Web arayüzü
+- [ ] Webhook desteği
+- [ ] Gelişmiş filtreleme
+- [ ] İstatistikler ve raporlama
+- [ ] Görsel yükleme düzeltmesi
+
