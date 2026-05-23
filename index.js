@@ -294,38 +294,47 @@ class TwitterToPrototurk {
     try {
       console.log(`🔍 ${username} profil bilgileri çekiliyor...`);
       
-      // RSS'den profil bilgilerini çek
-      const feed = await this.parser.parseURL(`https://nitter.net/${username}/rss`);
+      // Nitter sayfasından profil bilgilerini çek
+      const pageResponse = await axios.get(`https://nitter.net/${username}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:149.0) Gecko/20100101 Firefox/149.0'
+        }
+      });
       
-      if (!feed || !feed.title) {
-        console.log(`⚠️  Profil bilgisi bulunamadı`);
-        return null;
-      }
+      const dom = new JSDOM(pageResponse.data);
+      const doc = dom.window.document;
       
-      // RSS feed'den bilgileri al
-      // Feed title formatı: "Twitter / @username" veya sadece isim
-      const displayName = feed.title.replace('Twitter / ', '').replace('@' + username, '').trim() || username;
-      const bio = feed.description || '';
+      // Profil bilgilerini çıkar
+      const fullnameElement = doc.querySelector('.profile-card-fullname');
+      const displayName = fullnameElement?.textContent?.trim() || username;
       
-      // RSS'den avatar URL'sini çek (feed.image varsa)
+      const bioElement = doc.querySelector('.profile-bio');
+      const bio = bioElement?.textContent?.trim() || '';
+      
+      const websiteElement = doc.querySelector('.profile-website a');
+      const website = websiteElement?.getAttribute('title') || websiteElement?.textContent?.trim() || '';
+      
+      // Avatar URL'sini çek
+      const avatarElement = doc.querySelector('.profile-card-avatar');
       let avatarUrl = null;
-      if (feed.image && feed.image.url) {
-        avatarUrl = feed.image.url;
+      if (avatarElement) {
+        const src = avatarElement.getAttribute('src');
+        if (src) {
+          avatarUrl = src.startsWith('http') ? src : `https://nitter.net${src}`;
+        }
       }
       
-      // Website linkini RSS'den çek
-      let website = '';
-      if (feed.link) {
-        website = feed.link;
-      }
-      
-      console.log(`✅ Profil bilgileri alındı: ${displayName}`);
+      console.log(`✅ Profil bilgileri alındı:`);
+      console.log(`   İsim: ${displayName}`);
+      console.log(`   Bio: ${bio.substring(0, 50)}${bio.length > 50 ? '...' : ''}`);
+      console.log(`   Website: ${website || 'Yok'}`);
+      console.log(`   Avatar: ${avatarUrl ? 'Var' : 'Yok'}`);
       
       return {
         username: username,
-        displayName: displayName || username,
-        bio: bio || `${username} Twitter hesabı`,
-        website: website || `https://twitter.com/${username}`,
+        displayName: displayName,
+        bio: bio,
+        website: website,
         avatar: avatarUrl
       };
     } catch (error) {
@@ -333,8 +342,8 @@ class TwitterToPrototurk {
       return {
         username: username,
         displayName: username,
-        bio: `${username} Twitter hesabı`,
-        website: `https://twitter.com/${username}`,
+        bio: '',
+        website: '',
         avatar: null
       };
     }
