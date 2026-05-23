@@ -1,18 +1,16 @@
-// Popüler Türk Twitter hesapları (Politik olmayan)
 export const popularAccounts = {
   spor: [
-    'besiktas',
-    'galatasaray', 
-    'fenerbahce',
-    'trabzonspor',
+    'Besiktas',
+    'GalatasaraySK',
+    'Fenerbahce',
+    'Trabzonspor',
     'fikretorman',
     'sporx',
-    'fanatik',
+    'fanatikcomtr',
     'fotomac',
-    'goaldotcom_tr',
+    'GoalTurkiye',
     'ntvspor'
   ],
-  
   mizah: [
     'uykusuzdergi',
     'leman',
@@ -23,40 +21,38 @@ export const popularAccounts = {
     'komikresimler',
     'capsdunyasi'
   ],
-  
   teknoloji: [
     'webrazzi',
-    'shiftdelete',
+    'shiftdeletenet',
     'donanimhaber',
-    'teknolojioku',
-    'log',
-    'chip_online',
-    'pcnet',
+    'TeknolojiOku',
+    'logdergisi',
+    'chiponline',
     'teknoblog'
   ],
-  
   haber: [
+    'bpthaber',
     'cnnturk',
     'haberturk',
     'ntv',
-    'dha',
-    'aa_turkish',
+    'dhainternet',
+    'anadoluajansi',
     'bbcturkce',
     'euronews_tr',
-    'trthaber'
+    'trthaber',
+    't24comtr',
+    'bianet'
   ],
-  
   eglence: [
     'beyazshow',
     'showtvcomtr',
     'kanald',
     'startv',
     'atv',
-    'fox',
+    'nowtvturkiye',
     'tv8',
     'teve2'
   ],
-  
   muzik: [
     'kral_muzik',
     'powerfm',
@@ -67,50 +63,28 @@ export const popularAccounts = {
     'joyturk',
     'radyoeksen'
   ],
-  
   yemek: [
     'yemeksepeti',
-    'getir',
-    'trendyol',
-    'migros',
-    'carrefoursa',
-    'a101',
-    'bim',
-    'sok_marketler'
+    'getir'
   ],
-  
   moda: [
     'lcwaikiki',
     'defacto',
-    'koton',
-    'mango_turkey',
-    'zara_turkey',
-    'hm_turkey',
-    'pull_bear_tr',
-    'bershka_tr'
+    'koton'
   ],
-  
   genel: [
-    'sozcu',
+    'gazetesozcu',
     'hurriyet',
-    'milliyet',
-    'sabah',
-    'posta',
-    'takvim',
-    'yenisafak',
-    'aksam'
+    'milliyet'
   ]
 };
 
-// Tüm hesapları tek listede
 export const allAccounts = Object.values(popularAccounts).flat();
 
-// Kategori bazında hesap getir
 export function getAccountsByCategory(category) {
   return popularAccounts[category] || [];
 }
 
-// Rastgele N hesap seç
 export function getRandomAccounts(count = 10) {
   const shuffled = [...allAccounts].sort(() => 0.5 - Math.random());
   return shuffled.slice(0, count);

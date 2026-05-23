@@ -1,25 +1,24 @@
 [
   {
-    "twitterUsername": "kilicdarogluk",
-    "prototurkUsername": "",
-    "prototurkSession": "",
-    "prototurkCsrf": "",
-    "email": "",
-    "password": "",
-    "isPolitical": true,
-    "enabled": false,
-    "createdAt": "2026-05-23T21:00:00.000Z",
-    "note": "Politik hesap - devre dışı"
-  },
-  {
-    "twitterUsername": "takvim",
-    "prototurkUsername": "takvim",
-    "prototurkSession": "9h3dmqcV2BM4VgWePVnsYUH4aI7meSs_Y7n6FT-YOa8",
-    "prototurkCsrf": "ksx_ilIk8BKBHXKS87faRJR9W3DYfSFs9lO0-UmH-5s",
-    "email": "takvim_67383@outlook.com",
-    "password": "7SC#%*TynI%4t^s#3^bC",
+    "twitterUsername": "yemeksepeti",
+    "prototurkUsername": "yemeksepeti",
+    "prototurkSession": "fTqcL22JhbKTNPKN_kpQNfAjCumJQPVirekV9PCAvAE",
+    "prototurkCsrf": "ESBP_Akr4UAFjD8p9PorhlcjPB2ULVDIpjqPPz1nBn0",
+    "email": "yemeksepeti_47827@hotmail.com",
+    "password": "1#mHc*Z6GWV^Aqk4pbE5",
     "isPolitical": false,
     "enabled": true,
-    "createdAt": "2026-05-23T21:47:35.349Z"
+    "createdAt": "2026-05-23T22:26:13.124Z"
+  },
+  {
+    "twitterUsername": "getir",
+    "prototurkUsername": "getir",
+    "prototurkSession": "OMzTTUkY9b0Hoak6XPhGq_jcjhlvMFWnPbvMWzSPGKk",
+    "prototurkCsrf": "NEbmi0nbnXPv1BO1dnBopgrNPNEjHXhjeK-2y9qdPRY",
+    "email": "getir_92697@gmail.com",
+    "password": "UXyNFOKvUkRUZpILT4xF",
+    "isPolitical": false,
+    "enabled": true,
+    "createdAt": "2026-05-23T22:26:17.935Z"
   }
 ]
