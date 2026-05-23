@@ -466,17 +466,65 @@ class TwitterToPrototurk {
   async start() {
     console.log('🚀 Twitter (RSS) -> Prototurk çoklu hesap aktarımı başlatıldı\n');
     
-    // İlk çalıştırma
+    // İlk çalıştırma - profilleri senkronize et
+    await this.syncAllProfiles();
+    
+    // Tweet'leri çek
     await this.processNewTweets();
 
     // Periyodik kontrol
     const intervalMinutes = parseInt(process.env.CHECK_INTERVAL_MINUTES) || 5;
     console.log(`\n⏰ ${intervalMinutes} dakikada bir kontrol edilecek...\n`);
     
+    let cycleCount = 0;
     setInterval(async () => {
       console.log(`\n⏰ ${new Date().toLocaleString('tr-TR')} - Kontrol ediliyor...`);
+      
+      // Her 12 döngümde bir (1 saat) profilleri senkronize et
+      cycleCount++;
+      if (cycleCount % 12 === 0) {
+        console.log('\n🔄 Profil senkronizasyonu başlıyor...');
+        await this.syncAllProfiles();
+      }
+      
       await this.processNewTweets();
     }, intervalMinutes * 60 * 1000);
+  }
+
+  async syncAllProfiles() {
+    const accounts = await this.accountManager.getActiveAccounts();
+    
+    if (accounts.length === 0) {
+      return;
+    }
+
+    console.log(`\n🎨 ${accounts.length} hesabın profili senkronize ediliyor...\n`);
+
+    for (const account of accounts) {
+      try {
+        await this.syncProfile(account);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.error(`❌ ${account.twitterUsername} profil senkronizasyonu hatası:`, error.message);
+      }
+    }
+    
+    console.log('\n✅ Profil senkronizasyonu tamamlandı\n');
+  }
+
+  async syncProfile(account) {
+    console.log(`🔄 ${account.twitterUsername} profili güncelleniyor...`);
+    
+    // Twitter'dan profil bilgilerini çek
+    const profileInfo = await this.getTwitterProfileInfo(account.twitterUsername);
+    
+    if (!profileInfo) {
+      console.log(`⚠️  ${account.twitterUsername} profil bilgisi alınamadı`);
+      return;
+    }
+    
+    // Prototurk profilini güncelle
+    await this.updatePrototurkProfile(account, profileInfo);
   }
 
   // Yeni hesap ekleme fonksiyonu

@@ -16,13 +16,14 @@ Bu komut:
 - ✅ Popüler hesaplardan rastgele seçer
 - ✅ Politik kontrolü yapar
 - ✅ Prototurk hesapları oluşturur
-- ✅ Profilleri ayarlar
+- ✅ Profilleri ayarlar (isim, bio, foto)
 - ✅ İlk tweet'leri çeker
 - ✅ Tüm bilgileri kaydeder
 
 ## ✨ Özellikler
 
 - ✅ **Tek komutla kurulum** - Her şey otomatik
+- ✅ **Otomatik profil senkronizasyonu** - Her 1 saatte bir
 - ✅ Çoklu Twitter hesabı desteği
 - ✅ Otomatik Prototurk hesabı oluşturma
 - ✅ Politik hesap tespiti (otomatik filtreleme)
@@ -61,8 +62,21 @@ bun start
 
 Bot:
 - Her 5 dakikada bir yeni tweet'leri kontrol eder
+- Her 1 saatte bir profilleri senkronize eder
 - Bulduğu tweet'leri ilgili Prototurk hesabına gönderir
 - Otomatik çalışır, müdahale gerektirmez
+
+### Profil Senkronizasyonu
+
+```bash
+bun run sync
+```
+
+Tüm hesapların profillerini Twitter'dan çekip Prototurk'e aktarır:
+- Görünen isim
+- Bio
+- Website
+- Profil fotoğrafı
 
 ### Development Mode
 
@@ -73,6 +87,7 @@ bun dev
 ## 📁 Dosya Yapısı
 
 - `auto-setup.js` - **Tek komutla kurulum** ⭐
+- `sync-profiles.js` - **Profil senkronizasyonu** ⭐
 - `index.js` - Ana bot kodu
 - `account-manager.js` - Hesap yönetimi
 - `popular-accounts.js` - Popüler hesap listesi
@@ -115,6 +130,9 @@ bun run setup
 # Sürekli çalıştır
 bun start
 
+# Profilleri senkronize et
+bun run sync
+
 # Tek hesap test
 bun run test
 
@@ -134,8 +152,9 @@ bun run setup
 
 # 2. Bot otomatik çalışır
 # → 5 hesap oluşturulur
-# → Profiller ayarlanır
+# → Profiller ayarlanır  
 # → Tweet'ler çekilir
+# → Her 1 saatte profiller güncellenir
 
 # 3. Sürekli çalıştır
 bun start
@@ -144,10 +163,11 @@ bun start
 ## 🎉 Başarı Hikayeleri
 
 Test sonuçları:
-- ✅ webrazzi hesabı oluşturuldu
-- ✅ 6 tweet başarıyla aktarıldı
-- ✅ Duplicate kontrolü çalışıyor
-- ✅ Otomatik profil kurulumu
+- ✅ yemeksepeti hesabı oluşturuldu
+- ✅ getir hesabı oluşturuldu
+- ✅ Profiller otomatik senkronize
+- ✅ Tweet'ler başarıyla aktarılıyor
+- ✅ Görsel yükleme çalışıyor
 
 ## 🚀 Gelecek Özellikler
 
@@ -155,5 +175,5 @@ Test sonuçları:
 - [ ] Webhook desteği
 - [ ] Gelişmiş filtreleme
 - [ ] İstatistikler ve raporlama
-- [ ] Görsel yükleme düzeltmesi
+
 
