@@ -1,0 +1,16 @@
+{
+  "name": "twitter-to-prototurk",
+  "version": "1.0.0",
+  "description": "Twitter'dan dev.prototurk.com'a otomatik post aktarımı",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "bun run index.js",
+    "dev": "bun --watch index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.4.0",
+    "rss-parser": "^3.13.0"
+  }
+}
