@@ -58,22 +58,33 @@ class TwitterToPrototurk {
   }
 
   async fetchRSS(username) {
-    const rssUrl = `https://nitter.net/${username}/rss`;
+    // Farklı Nitter instance'ları
+    const nitterInstances = [
+      'https://nitter.net',
+      'https://nitter.poast.org',
+      'https://nitter.privacydev.net',
+      'https://nitter.1d4.us'
+    ];
     
-    try {
-      console.log(`📥 RSS çekiliyor: ${rssUrl}`);
-      const feed = await this.parser.parseURL(rssUrl);
+    for (const instance of nitterInstances) {
+      const rssUrl = `${instance}/${username}/rss`;
       
-      if (feed.items && feed.items.length > 0) {
-        console.log(`✅ ${feed.items.length} tweet bulundu`);
-        return feed.items;
+      try {
+        console.log(`📥 RSS çekiliyor: ${rssUrl}`);
+        const feed = await this.parser.parseURL(rssUrl);
+        
+        if (feed.items && feed.items.length > 0) {
+          console.log(`✅ ${feed.items.length} tweet bulundu`);
+          return feed.items;
+        }
+      } catch (error) {
+        console.log(`⚠️  ${instance} RSS başarısız, sonrakini deniyorum...`);
+        continue;
       }
-      
-      return [];
-    } catch (error) {
-      console.error('❌ RSS çekme hatası:', error.message);
-      return [];
     }
+    
+    console.error('❌ Tüm Nitter instance\'ları başarısız oldu');
+    return [];
   }
 
   async postToPrototurk(account, content, images = []) {
@@ -291,62 +302,80 @@ class TwitterToPrototurk {
   }
 
   async getTwitterProfileInfo(username) {
-    try {
-      console.log(`🔍 ${username} profil bilgileri çekiliyor...`);
-      
-      // Nitter sayfasından profil bilgilerini çek
-      const pageResponse = await axios.get(`https://nitter.net/${username}`, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:149.0) Gecko/20100101 Firefox/149.0'
+    // Farklı Nitter instance'ları
+    const nitterInstances = [
+      'https://nitter.net',
+      'https://nitter.poast.org',
+      'https://nitter.privacydev.net',
+      'https://nitter.1d4.us'
+    ];
+    
+    for (const instance of nitterInstances) {
+      try {
+        console.log(`🔍 ${username} profil bilgileri çekiliyor (${instance})...`);
+        
+        const pageResponse = await axios.get(`${instance}/${username}`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:149.0) Gecko/20100101 Firefox/149.0'
+          },
+          timeout: 10000
+        });
+        
+        const dom = new JSDOM(pageResponse.data);
+        const doc = dom.window.document;
+        
+        // Profil bilgilerini çıkar
+        const fullnameElement = doc.querySelector('.profile-card-fullname');
+        const displayName = fullnameElement?.textContent?.trim() || username;
+        
+        const bioElement = doc.querySelector('.profile-bio');
+        const bio = bioElement?.textContent?.trim() || '';
+        
+        const websiteElement = doc.querySelector('.profile-website a');
+        const website = websiteElement?.getAttribute('title') || websiteElement?.textContent?.trim() || '';
+        
+        // Avatar URL'sini çek
+        const avatarElement = doc.querySelector('.profile-card-avatar');
+        let avatarUrl = null;
+        if (avatarElement) {
+          const src = avatarElement.getAttribute('src');
+          if (src) {
+            avatarUrl = src.startsWith('http') ? src : `${instance}${src}`;
+          }
         }
-      });
-      
-      const dom = new JSDOM(pageResponse.data);
-      const doc = dom.window.document;
-      
-      // Profil bilgilerini çıkar
-      const fullnameElement = doc.querySelector('.profile-card-fullname');
-      const displayName = fullnameElement?.textContent?.trim() || username;
-      
-      const bioElement = doc.querySelector('.profile-bio');
-      const bio = bioElement?.textContent?.trim() || '';
-      
-      const websiteElement = doc.querySelector('.profile-website a');
-      const website = websiteElement?.getAttribute('title') || websiteElement?.textContent?.trim() || '';
-      
-      // Avatar URL'sini çek
-      const avatarElement = doc.querySelector('.profile-card-avatar');
-      let avatarUrl = null;
-      if (avatarElement) {
-        const src = avatarElement.getAttribute('src');
-        if (src) {
-          avatarUrl = src.startsWith('http') ? src : `https://nitter.net${src}`;
+        
+        // Eğer gerçek bilgi aldıysak (sadece username değilse)
+        if (displayName !== username || bio || website || avatarUrl) {
+          console.log(`✅ Profil bilgileri alındı:`);
+          console.log(`   İsim: ${displayName}`);
+          console.log(`   Bio: ${bio.substring(0, 50)}${bio.length > 50 ? '...' : ''}`);
+          console.log(`   Website: ${website || 'Yok'}`);
+          console.log(`   Avatar: ${avatarUrl ? 'Var' : 'Yok'}`);
+          
+          return {
+            username: username,
+            displayName: displayName,
+            bio: bio,
+            website: website,
+            avatar: avatarUrl
+          };
         }
+        
+      } catch (error) {
+        console.log(`⚠️  ${instance} başarısız, sonrakini deniyorum...`);
+        continue;
       }
-      
-      console.log(`✅ Profil bilgileri alındı:`);
-      console.log(`   İsim: ${displayName}`);
-      console.log(`   Bio: ${bio.substring(0, 50)}${bio.length > 50 ? '...' : ''}`);
-      console.log(`   Website: ${website || 'Yok'}`);
-      console.log(`   Avatar: ${avatarUrl ? 'Var' : 'Yok'}`);
-      
-      return {
-        username: username,
-        displayName: displayName,
-        bio: bio,
-        website: website,
-        avatar: avatarUrl
-      };
-    } catch (error) {
-      console.error(`⚠️  Profil bilgisi çekme hatası:`, error.message);
-      return {
-        username: username,
-        displayName: username,
-        bio: '',
-        website: '',
-        avatar: null
-      };
     }
+    
+    // Hiçbir instance çalışmadı
+    console.error(`❌ Tüm Nitter instance'ları başarısız oldu`);
+    return {
+      username: username,
+      displayName: username,
+      bio: '',
+      website: '',
+      avatar: null
+    };
   }
 
   async uploadImageToPrototurk(account, imageBuffer, contentType) {
