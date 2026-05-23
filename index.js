@@ -302,31 +302,30 @@ class TwitterToPrototurk {
         return null;
       }
       
-      // Nitter sayfasından detaylı bilgi çek
-      const pageResponse = await axios.get(`https://nitter.net/${username}`, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:149.0) Gecko/20100101 Firefox/149.0'
-        }
-      });
+      // RSS feed'den bilgileri al
+      // Feed title formatı: "Twitter / @username" veya sadece isim
+      const displayName = feed.title.replace('Twitter / ', '').replace('@' + username, '').trim() || username;
+      const bio = feed.description || '';
       
-      const { JSDOM } = await import('jsdom');
-      const dom = new JSDOM(pageResponse.data);
-      const doc = dom.window.document;
+      // RSS'den avatar URL'sini çek (feed.image varsa)
+      let avatarUrl = null;
+      if (feed.image && feed.image.url) {
+        avatarUrl = feed.image.url;
+      }
       
-      // Profil bilgilerini çıkar
-      const displayName = doc.querySelector('.profile-card-fullname')?.textContent?.trim() || username;
-      const bio = doc.querySelector('.profile-bio')?.textContent?.trim() || '';
-      const website = doc.querySelector('.profile-website a')?.href || '';
-      const avatarElement = doc.querySelector('.profile-card-avatar');
-      const avatarUrl = avatarElement ? `https://nitter.net${avatarElement.src}` : null;
+      // Website linkini RSS'den çek
+      let website = '';
+      if (feed.link) {
+        website = feed.link;
+      }
       
       console.log(`✅ Profil bilgileri alındı: ${displayName}`);
       
       return {
         username: username,
-        displayName: displayName,
-        bio: bio,
-        website: website,
+        displayName: displayName || username,
+        bio: bio || `${username} Twitter hesabı`,
+        website: website || `https://twitter.com/${username}`,
         avatar: avatarUrl
       };
     } catch (error) {
@@ -334,8 +333,8 @@ class TwitterToPrototurk {
       return {
         username: username,
         displayName: username,
-        bio: '',
-        website: '',
+        bio: `${username} Twitter hesabı`,
+        website: `https://twitter.com/${username}`,
         avatar: null
       };
     }
