@@ -102,10 +102,26 @@ class TwitterToPrototurk {
         }
       ];
       
-      // Görselleri ekle (şimdilik atla, API endpoint bulunamadı)
+      // Görselleri ekle
       if (images && images.length > 0) {
-        console.log(`🖼️  ${images.length} görsel bulundu (yükleme devre dışı)`);
-        // TODO: Doğru upload endpoint bulunca aktif et
+        console.log(`🖼️  ${images.length} görsel ekleniyor...`);
+        
+        for (const imageUrl of images) {
+          const imageData = await this.downloadImage(imageUrl);
+          if (imageData) {
+            const uploadedUrl = await this.uploadImageToPrototurk(account, imageData.buffer, imageData.contentType);
+            if (uploadedUrl) {
+              contentJsonParts.push({
+                type: "image",
+                attrs: {
+                  src: uploadedUrl,
+                  alt: "Tweet görseli",
+                  title: null
+                }
+              });
+            }
+          }
+        }
       }
       
       const payload = {
@@ -180,14 +196,14 @@ class TwitterToPrototurk {
       const payload = {
         displayName: profileData.displayName,
         bio: profileData.bio || '',
-        location: profileData.location || ''
+        website: profileData.website || ''
       };
       
       console.log(`   İsim: ${profileData.displayName}`);
       console.log(`   Bio: ${profileData.bio?.substring(0, 50) || 'Yok'}...`);
       
       const response = await axios.patch(
-        `${this.prototurkBaseUrl}/api/user/profile`,
+        `${this.prototurkBaseUrl}/api/account/profile`,
         payload,
         {
           headers: {
@@ -231,13 +247,13 @@ class TwitterToPrototurk {
       const form = new FormData();
       
       const ext = imageData.contentType.includes('png') ? 'png' : 'jpg';
-      form.append('avatar', imageData.buffer, {
+      form.append('file', imageData.buffer, {
         filename: `avatar.${ext}`,
         contentType: imageData.contentType
       });
       
       const response = await axios.post(
-        `${this.prototurkBaseUrl}/api/user/avatar`,
+        `${this.prototurkBaseUrl}/api/uploads`,
         form,
         {
           headers: {
@@ -248,7 +264,25 @@ class TwitterToPrototurk {
         }
       );
       
-      console.log(`✅ Profil fotoğrafı yüklendi`);
+      console.log(`✅ Profil fotoğrafı yüklendi:`, response.data);
+      
+      // Avatar URL'sini profile kaydet
+      if (response.data.url || response.data.path) {
+        const avatarUrl = response.data.url || response.data.path;
+        await axios.patch(
+          `${this.prototurkBaseUrl}/api/account/profile`,
+          { avatar: avatarUrl },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Cookie': `pt_session=${account.prototurkSession}; pt_csrf=${account.prototurkCsrf}`,
+              'x-csrf-token': account.prototurkCsrf,
+            }
+          }
+        );
+        console.log(`✅ Avatar profilde güncellendi`);
+      }
+      
       return response.data;
     } catch (error) {
       console.error(`⚠️  Avatar yükleme hatası:`, error.response?.data || error.message);
@@ -282,7 +316,7 @@ class TwitterToPrototurk {
       // Profil bilgilerini çıkar
       const displayName = doc.querySelector('.profile-card-fullname')?.textContent?.trim() || username;
       const bio = doc.querySelector('.profile-bio')?.textContent?.trim() || '';
-      const location = doc.querySelector('.profile-location')?.textContent?.trim() || '';
+      const website = doc.querySelector('.profile-website a')?.href || '';
       const avatarElement = doc.querySelector('.profile-card-avatar');
       const avatarUrl = avatarElement ? `https://nitter.net${avatarElement.src}` : null;
       
@@ -292,7 +326,7 @@ class TwitterToPrototurk {
         username: username,
         displayName: displayName,
         bio: bio,
-        location: location,
+        website: website,
         avatar: avatarUrl
       };
     } catch (error) {
@@ -301,7 +335,7 @@ class TwitterToPrototurk {
         username: username,
         displayName: username,
         bio: '',
-        location: '',
+        website: '',
         avatar: null
       };
     }
@@ -314,46 +348,28 @@ class TwitterToPrototurk {
       
       // Dosya uzantısını content-type'dan belirle
       const ext = contentType.includes('png') ? 'png' : 'jpg';
-      form.append('image', imageBuffer, {
+      form.append('file', imageBuffer, {
         filename: `image.${ext}`,
         contentType: contentType
       });
       
-      // Farklı endpoint'leri dene
-      const endpoints = [
-        '/api/upload/image',
-        '/api/posts/upload',
-        '/api/media/upload',
-        '/api/upload'
-      ];
-      
-      for (const endpoint of endpoints) {
-        try {
-          const response = await axios.post(
-            `${this.prototurkBaseUrl}${endpoint}`,
-            form,
-            {
-              headers: {
-                ...form.getHeaders(),
-                'Cookie': `pt_session=${account.prototurkSession}; pt_csrf=${account.prototurkCsrf}`,
-                'x-csrf-token': account.prototurkCsrf,
-              }
-            }
-          );
-          
-          console.log(`✅ Görsel yüklendi (${endpoint}):`, response.data);
-          return response.data.url || response.data.path || response.data.src;
-        } catch (error) {
-          // Bu endpoint çalışmadı, sonrakini dene
-          continue;
+      const response = await axios.post(
+        `${this.prototurkBaseUrl}/api/uploads`,
+        form,
+        {
+          headers: {
+            ...form.getHeaders(),
+            'Cookie': `pt_session=${account.prototurkSession}; pt_csrf=${account.prototurkCsrf}`,
+            'x-csrf-token': account.prototurkCsrf,
+          }
         }
-      }
+      );
       
-      console.log('⚠️  Hiçbir upload endpoint çalışmadı, görsel atlanıyor');
-      return null;
+      console.log(`✅ Görsel yüklendi:`, response.data);
+      return response.data.url || response.data.path;
       
     } catch (error) {
-      console.error('⚠️  Görsel yükleme hatası:', error.message);
+      console.error('⚠️  Görsel yükleme hatası:', error.response?.data || error.message);
       return null;
     }
   }
