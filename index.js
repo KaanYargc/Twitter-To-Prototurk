@@ -102,26 +102,10 @@ class TwitterToPrototurk {
         }
       ];
       
-      // Görselleri ekle
+      // Görselleri ekle (şimdilik atla, API endpoint bulunamadı)
       if (images && images.length > 0) {
-        console.log(`🖼️  ${images.length} görsel ekleniyor...`);
-        
-        for (const imageUrl of images) {
-          const imageData = await this.downloadImage(imageUrl);
-          if (imageData) {
-            const uploadedUrl = await this.uploadImageToPrototurk(account, imageData.buffer, imageData.contentType);
-            if (uploadedUrl) {
-              contentJsonParts.push({
-                type: "image",
-                attrs: {
-                  src: uploadedUrl,
-                  alt: "Tweet görseli",
-                  title: null
-                }
-              });
-            }
-          }
-        }
+        console.log(`🖼️  ${images.length} görsel bulundu (yükleme devre dışı)`);
+        // TODO: Doğru upload endpoint bulunca aktif et
       }
       
       const payload = {
@@ -330,26 +314,46 @@ class TwitterToPrototurk {
       
       // Dosya uzantısını content-type'dan belirle
       const ext = contentType.includes('png') ? 'png' : 'jpg';
-      form.append('file', imageBuffer, {
+      form.append('image', imageBuffer, {
         filename: `image.${ext}`,
         contentType: contentType
       });
       
-      const response = await axios.post(
-        `${this.prototurkBaseUrl}/api/upload`,
-        form,
-        {
-          headers: {
-            ...form.getHeaders(),
-            'Cookie': `pt_session=${account.prototurkSession}; pt_csrf=${account.prototurkCsrf}`,
-            'x-csrf-token': account.prototurkCsrf,
-          }
-        }
-      );
+      // Farklı endpoint'leri dene
+      const endpoints = [
+        '/api/upload/image',
+        '/api/posts/upload',
+        '/api/media/upload',
+        '/api/upload'
+      ];
       
-      return response.data.url || response.data.path;
+      for (const endpoint of endpoints) {
+        try {
+          const response = await axios.post(
+            `${this.prototurkBaseUrl}${endpoint}`,
+            form,
+            {
+              headers: {
+                ...form.getHeaders(),
+                'Cookie': `pt_session=${account.prototurkSession}; pt_csrf=${account.prototurkCsrf}`,
+                'x-csrf-token': account.prototurkCsrf,
+              }
+            }
+          );
+          
+          console.log(`✅ Görsel yüklendi (${endpoint}):`, response.data);
+          return response.data.url || response.data.path || response.data.src;
+        } catch (error) {
+          // Bu endpoint çalışmadı, sonrakini dene
+          continue;
+        }
+      }
+      
+      console.log('⚠️  Hiçbir upload endpoint çalışmadı, görsel atlanıyor');
+      return null;
+      
     } catch (error) {
-      console.error('⚠️  Prototurk\'e görsel yükleme hatası:', error.response?.data || error.message);
+      console.error('⚠️  Görsel yükleme hatası:', error.message);
       return null;
     }
   }
