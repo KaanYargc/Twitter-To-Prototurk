@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import Parser from 'rss-parser';
 import axios from 'axios';
 import fs from 'fs/promises';
-import { JSDOM } from 'jsdom';
+import * as cheerio from 'cheerio';
 import AccountManager from './account-manager.js';
 
 dotenv.config();
@@ -161,12 +161,11 @@ class TwitterToPrototurk {
 
   extractImagesFromContent(htmlContent) {
     try {
-      const dom = new JSDOM(htmlContent);
-      const images = dom.window.document.querySelectorAll('img');
+      const $ = cheerio.load(htmlContent);
       const imageUrls = [];
       
-      images.forEach(img => {
-        const src = img.src;
+      $('img').each((index, img) => {
+        const src = $(img).attr('src');
         if (src && !src.includes('emoji') && !src.includes('icon')) {
           // Nitter'daki görselleri tam URL'e çevir
           const fullUrl = src.startsWith('http') ? src : `https://nitter.net${src}`;
@@ -183,16 +182,24 @@ class TwitterToPrototurk {
 
   async downloadImage(url) {
     try {
+      console.log(`   📥 Görsel indiriliyor: ${url}`);
       const response = await axios.get(url, {
         responseType: 'arraybuffer',
+        timeout: 15000, // 15 saniye timeout
         headers: {
-          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:149.0) Gecko/20100101 Firefox/149.0'
-        }
+          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:149.0) Gecko/20100101 Firefox/149.0',
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive'
+        },
+        maxRedirects: 5
       });
+      
+      console.log(`   ✅ Görsel indirildi (${response.data.length} bytes, ${response.headers['content-type']})`);
       
       return {
         buffer: response.data,
-        contentType: response.headers['content-type']
+        contentType: response.headers['content-type'] || 'image/jpeg'
       };
     } catch (error) {
       console.error('⚠️  Görsel indirme hatası:', url, error.message);
@@ -202,16 +209,32 @@ class TwitterToPrototurk {
 
   async updatePrototurkProfile(account, profileData) {
     try {
-      console.log(`👤 ${account.twitterUsername} için profil güncelleniyor...`);
+      console.log(`\n👤 ${account.twitterUsername} için profil güncelleniyor...`);
       
+      // Önce profil fotoğrafını yükle (varsa)
+      let avatarKey = null;
+      if (profileData.avatar) {
+        avatarKey = await this.uploadPrototurkAvatar(account, profileData.avatar);
+      }
+      
+      // Profil bilgilerini hazırla
       const payload = {
-        displayName: profileData.displayName,
-        bio: profileData.bio || '',
-        website: profileData.website || ''
+        name: profileData.displayName,
+        about: profileData.bio || '',
+        websiteUrl: profileData.website || ''
       };
       
+      // Avatar key varsa ekle
+      if (avatarKey) {
+        payload.avatar = avatarKey;
+      }
+      
       console.log(`   İsim: ${profileData.displayName}`);
-      console.log(`   Bio: ${profileData.bio?.substring(0, 50) || 'Yok'}...`);
+      console.log(`   Bio: ${profileData.bio?.substring(0, 50) || 'Yok'}${profileData.bio?.length > 50 ? '...' : ''}`);
+      console.log(`   Website: ${profileData.website || 'Yok'}`);
+      if (avatarKey) {
+        console.log(`   Avatar Key: ${avatarKey}`);
+      }
       
       const response = await axios.patch(
         `${this.prototurkBaseUrl}/api/account/profile`,
@@ -224,27 +247,26 @@ class TwitterToPrototurk {
             'Origin': this.prototurkBaseUrl,
             'Referer': `${this.prototurkBaseUrl}/settings`,
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:149.0) Gecko/20100101 Firefox/149.0'
-          }
+          },
+          timeout: 10000
         }
       );
 
-      console.log(`✅ Profil güncellendi`);
-      
-      // Profil fotoğrafı varsa yükle
-      if (profileData.avatar) {
-        await this.updatePrototurkAvatar(account, profileData.avatar);
-      }
+      console.log(`   ✅ Profil güncellendi`);
       
       return response.data;
     } catch (error) {
-      console.error(`⚠️  Profil güncelleme hatası:`, error.response?.data || error.message);
+      console.error(`❌ Profil güncelleme hatası:`, error.response?.data || error.message);
+      if (error.response) {
+        console.error(`   Status: ${error.response.status}`);
+      }
       return null;
     }
   }
 
-  async updatePrototurkAvatar(account, avatarUrl) {
+  async uploadPrototurkAvatar(account, avatarUrl) {
     try {
-      console.log(`🖼️  Profil fotoğrafı yükleniyor...`);
+      console.log(`🖼️  Profil fotoğrafı yükleniyor: ${avatarUrl}`);
       
       // Avatar'ı indir
       const imageData = await this.downloadImage(avatarUrl);
@@ -263,7 +285,9 @@ class TwitterToPrototurk {
         contentType: imageData.contentType
       });
       
-      const response = await axios.post(
+      console.log(`   📤 Prototurk'e yükleniyor...`);
+      
+      const uploadResponse = await axios.post(
         `${this.prototurkBaseUrl}/api/uploads`,
         form,
         {
@@ -271,32 +295,30 @@ class TwitterToPrototurk {
             ...form.getHeaders(),
             'Cookie': `pt_session=${account.prototurkSession}; pt_csrf=${account.prototurkCsrf}`,
             'x-csrf-token': account.prototurkCsrf,
-          }
+            'Origin': this.prototurkBaseUrl,
+            'Referer': `${this.prototurkBaseUrl}/settings`,
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:149.0) Gecko/20100101 Firefox/149.0'
+          },
+          timeout: 30000
         }
       );
       
-      console.log(`✅ Profil fotoğrafı yüklendi:`, response.data);
+      console.log(`   ✅ Profil fotoğrafı yüklendi`);
       
-      // Avatar URL'sini profile kaydet
-      if (response.data.url || response.data.path) {
-        const avatarUrl = response.data.url || response.data.path;
-        await axios.patch(
-          `${this.prototurkBaseUrl}/api/account/profile`,
-          { avatar: avatarUrl },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Cookie': `pt_session=${account.prototurkSession}; pt_csrf=${account.prototurkCsrf}`,
-              'x-csrf-token': account.prototurkCsrf,
-            }
-          }
-        );
-        console.log(`✅ Avatar profilde güncellendi`);
+      // Avatar key'ini döndür
+      if (uploadResponse.data && uploadResponse.data.key) {
+        return uploadResponse.data.key;
+      } else {
+        console.log(`   ⚠️  Avatar key bulunamadı`);
+        return null;
       }
       
-      return response.data;
     } catch (error) {
-      console.error(`⚠️  Avatar yükleme hatası:`, error.response?.data || error.message);
+      console.error(`❌ Avatar yükleme hatası:`, error.response?.data || error.message);
+      if (error.response) {
+        console.error(`   Status: ${error.response.status}`);
+        console.error(`   Headers:`, error.response.headers);
+      }
       return null;
     }
   }
@@ -314,52 +336,100 @@ class TwitterToPrototurk {
       try {
         console.log(`🔍 ${username} profil bilgileri çekiliyor (${instance})...`);
         
-        const pageResponse = await axios.get(`${instance}/${username}`, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:149.0) Gecko/20100101 Firefox/149.0'
-          },
-          timeout: 10000
-        });
+        // RSS feed'i çek
+        const feed = await this.parser.parseURL(`${instance}/${username}/rss`);
         
-        const dom = new JSDOM(pageResponse.data);
-        const doc = dom.window.document;
+        if (!feed || !feed.title) {
+          continue;
+        }
         
-        // Profil bilgilerini çıkar
-        const fullnameElement = doc.querySelector('.profile-card-fullname');
-        const displayName = fullnameElement?.textContent?.trim() || username;
+        // RSS'den profil bilgilerini çıkar
+        // Title formatı: "Display Name / @username"
+        let displayName = username; // Varsayılan
+        if (feed.title.includes(' / @')) {
+          displayName = feed.title.split(' / @')[0].trim();
+        }
         
-        const bioElement = doc.querySelector('.profile-bio');
-        const bio = bioElement?.textContent?.trim() || '';
-        
-        const websiteElement = doc.querySelector('.profile-website a');
-        const website = websiteElement?.getAttribute('title') || websiteElement?.textContent?.trim() || '';
-        
-        // Avatar URL'sini çek
-        const avatarElement = doc.querySelector('.profile-card-avatar');
+        // Avatar URL - RSS feed.image.url'den
         let avatarUrl = null;
-        if (avatarElement) {
-          const src = avatarElement.getAttribute('src');
-          if (src) {
-            avatarUrl = src.startsWith('http') ? src : `${instance}${src}`;
+        if (feed.image && feed.image.url) {
+          // Nitter proxy URL'ini gerçek Twitter URL'ine çevir
+          // Örnek: https://nitter.net/pic/pbs.twimg.com%2Fprofile_images%2F...
+          avatarUrl = feed.image.url;
+          
+          // URL decode et ve gerçek Twitter URL'ini oluştur
+          if (avatarUrl.includes('nitter.net/pic/')) {
+            const encodedPath = avatarUrl.split('nitter.net/pic/')[1];
+            const decodedPath = decodeURIComponent(encodedPath);
+            // Eğer decode edilmiş path zaten https:// ile başlıyorsa, olduğu gibi kullan
+            avatarUrl = decodedPath.startsWith('http') ? decodedPath : `https://${decodedPath}`;
+            console.log(`   Avatar URL decode edildi: ${avatarUrl}`);
           }
         }
         
-        // Eğer gerçek bilgi aldıysak (sadece username değilse)
-        if (displayName !== username || bio || website || avatarUrl) {
-          console.log(`✅ Profil bilgileri alındı:`);
-          console.log(`   İsim: ${displayName}`);
-          console.log(`   Bio: ${bio.substring(0, 50)}${bio.length > 50 ? '...' : ''}`);
-          console.log(`   Website: ${website || 'Yok'}`);
-          console.log(`   Avatar: ${avatarUrl ? 'Var' : 'Yok'}`);
+        // Bio için HTML sayfasını parse et (Cheerio ile)
+        let bio = '';
+        try {
+          const response = await axios.get(`${instance}/${username}`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+              'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'Connection': 'keep-alive',
+              'Upgrade-Insecure-Requests': '1',
+              'Sec-Fetch-Dest': 'document',
+              'Sec-Fetch-Mode': 'navigate',
+              'Sec-Fetch-Site': 'none',
+              'Cache-Control': 'max-age=0'
+            },
+            timeout: 10000
+          });
           
-          return {
-            username: username,
-            displayName: displayName,
-            bio: bio,
-            website: website,
-            avatar: avatarUrl
-          };
+          const $ = cheerio.load(response.data);
+          
+          // Bio bilgisini çek - div.profile-bio içindeki p tag'inden
+          const bioElement = $('.profile-bio p');
+          if (bioElement.length > 0) {
+            bio = bioElement.text().trim();
+          }
+          
+          // Alternatif: doğrudan div.profile-bio
+          if (!bio) {
+            bio = $('div.profile-bio').text().trim();
+          }
+          
+          // Diğer alternatifler
+          if (!bio) {
+            bio = $('.profile-card-bio').text().trim();
+          }
+          
+          if (!bio) {
+            bio = $('.profile-card-extra .profile-bio p').text().trim();
+          }
+          
+        } catch (error) {
+          // Bio alınamazsa boş bırak
+          console.log(`⚠️  Bio çekilemedi: ${error.message}`);
         }
+        
+        // Bio bulunamadıysa, displayName'den anlamlı bir bio oluştur
+        if (!bio) {
+          bio = `${displayName} resmi ProtoTürk hesabı`;
+        }
+        
+        console.log(`✅ Profil bilgileri alındı:`);
+        console.log(`   İsim: ${displayName}`);
+        console.log(`   Bio: ${bio}`);
+        console.log(`   Avatar: ${avatarUrl ? 'Var' : 'Yok'}`);
+        
+        return {
+          username: username,
+          displayName: displayName,
+          bio: bio,
+          website: `https://twitter.com/${username}`,
+          avatar: avatarUrl
+        };
         
       } catch (error) {
         console.log(`⚠️  ${instance} başarısız, sonrakini deniyorum...`);
@@ -372,8 +442,8 @@ class TwitterToPrototurk {
     return {
       username: username,
       displayName: username,
-      bio: '',
-      website: '',
+      bio: `${username} resmi ProtoTürk hesabı`,
+      website: `https://twitter.com/${username}`,
       avatar: null
     };
   }
@@ -457,24 +527,36 @@ class TwitterToPrototurk {
     // Eski -> yeni sırasında işle
     const sortedItems = newItems.reverse();
 
-    for (const item of sortedItems) {
-      try {
-        const content = this.cleanTweetContent(item.contentSnippet || item.description || item.title);
-        const images = this.extractImagesFromContent(item.content || item.description || '');
-        
-        console.log(`\n📝 ${username}: ${content.substring(0, 50)}...`);
-        console.log(`🔗 Link: ${item.link}`);
-        if (images.length > 0) {
-          console.log(`🖼️  ${images.length} görsel bulundu`);
-        }
-        
-        await this.postToPrototurk(account, content, images);
-        await this.saveLastProcessedLink(username, item.link);
-        
-        // Rate limiting için bekleme
-        await new Promise(resolve => setTimeout(resolve, 3000));
-      } catch (error) {
-        console.error(`❌ ${username}: Tweet işlenirken hata: ${item.link}`);
+    // Tweet'leri paralel gönder (max 5 aynı anda)
+    const batchSize = 5;
+    
+    for (let i = 0; i < sortedItems.length; i += batchSize) {
+      const batch = sortedItems.slice(i, i + batchSize);
+      
+      await Promise.all(
+        batch.map(async (item) => {
+          try {
+            const content = this.cleanTweetContent(item.contentSnippet || item.description || item.title);
+            const images = this.extractImagesFromContent(item.content || item.description || '');
+            
+            console.log(`\n📝 ${username}: ${content.substring(0, 50)}...`);
+            console.log(`🔗 Link: ${item.link}`);
+            if (images.length > 0) {
+              console.log(`🖼️  ${images.length} görsel bulundu`);
+            }
+            
+            await this.postToPrototurk(account, content, images);
+            await this.saveLastProcessedLink(username, item.link);
+            
+          } catch (error) {
+            console.error(`❌ ${username}: Tweet işlenirken hata: ${item.link}`);
+          }
+        })
+      );
+      
+      // Batch'ler arası kısa bekleme
+      if (i + batchSize < sortedItems.length) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
   }
@@ -489,22 +571,39 @@ class TwitterToPrototurk {
 
     console.log(`\n📊 ${accounts.length} hesap işlenecek...\n`);
 
-    for (const account of accounts) {
-      try {
-        await this.processAccountTweets(account);
-      } catch (error) {
-        console.error(`❌ ${account.twitterUsername} işlenirken hata:`, error.message);
-      }
+    // Paralel işleme için Promise.all kullan (max 10 hesap aynı anda)
+    const batchSize = 10;
+    
+    for (let i = 0; i < accounts.length; i += batchSize) {
+      const batch = accounts.slice(i, i + batchSize);
+      console.log(`\n🔄 Batch ${Math.floor(i / batchSize) + 1}: ${batch.length} hesap paralel işleniyor...\n`);
       
-      // Hesaplar arası bekleme
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await Promise.all(
+        batch.map(async (account) => {
+          try {
+            await this.processAccountTweets(account);
+          } catch (error) {
+            console.error(`❌ ${account.twitterUsername} işlenirken hata:`, error.message);
+          }
+        })
+      );
+      
+      // Batch'ler arası kısa bekleme
+      if (i + batchSize < accounts.length) {
+        console.log('\n⏳ Sonraki batch için 3 saniye bekleniyor...\n');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
     }
+    
+    console.log('\n✅ Tüm hesaplar işlendi!\n');
   }
 
   async start() {
     console.log('🚀 Twitter (RSS) -> Prototurk çoklu hesap aktarımı başlatıldı\n');
     
-    // İlk çalıştırma - profilleri senkronize et
+    // İlk çalıştırma - profil senkronizasyonu
+    console.log('🔄 PROFIL SENKRONİZASYONU\n');
+    console.log('Tüm hesapların profil bilgileri Twitter\'dan çekilip Prototurk\'e aktarılacak.\n');
     await this.syncAllProfiles();
     
     // Tweet'leri çek
@@ -514,19 +613,16 @@ class TwitterToPrototurk {
     const intervalMinutes = parseInt(process.env.CHECK_INTERVAL_MINUTES) || 5;
     console.log(`\n⏰ ${intervalMinutes} dakikada bir kontrol edilecek...\n`);
     
-    let cycleCount = 0;
     setInterval(async () => {
       console.log(`\n⏰ ${new Date().toLocaleString('tr-TR')} - Kontrol ediliyor...`);
-      
-      // Her 12 döngümde bir (1 saat) profilleri senkronize et
-      cycleCount++;
-      if (cycleCount % 12 === 0) {
-        console.log('\n🔄 Profil senkronizasyonu başlıyor...');
-        await this.syncAllProfiles();
-      }
-      
       await this.processNewTweets();
     }, intervalMinutes * 60 * 1000);
+    
+    // Her 1 saatte bir profil senkronizasyonu
+    setInterval(async () => {
+      console.log(`\n🔄 ${new Date().toLocaleString('tr-TR')} - Profil senkronizasyonu...`);
+      await this.syncAllProfiles();
+    }, 60 * 60 * 1000); // 1 saat
   }
 
   async syncAllProfiles() {
@@ -538,12 +634,27 @@ class TwitterToPrototurk {
 
     console.log(`\n🎨 ${accounts.length} hesabın profili senkronize ediliyor...\n`);
 
-    for (const account of accounts) {
-      try {
-        await this.syncProfile(account);
+    // Paralel profil senkronizasyonu (max 10 aynı anda)
+    const batchSize = 10;
+    
+    for (let i = 0; i < accounts.length; i += batchSize) {
+      const batch = accounts.slice(i, i + batchSize);
+      console.log(`🔄 Batch ${Math.floor(i / batchSize) + 1}: ${batch.length} profil paralel güncelleniyor...\n`);
+      
+      await Promise.all(
+        batch.map(async (account) => {
+          try {
+            await this.syncProfile(account);
+          } catch (error) {
+            console.error(`❌ ${account.twitterUsername} profil senkronizasyonu hatası:`, error.message);
+          }
+        })
+      );
+      
+      // Batch'ler arası kısa bekleme
+      if (i + batchSize < accounts.length) {
+        console.log('\n⏳ Sonraki batch için 2 saniye bekleniyor...\n');
         await new Promise(resolve => setTimeout(resolve, 2000));
-      } catch (error) {
-        console.error(`❌ ${account.twitterUsername} profil senkronizasyonu hatası:`, error.message);
       }
     }
     

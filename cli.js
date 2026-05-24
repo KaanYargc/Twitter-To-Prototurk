@@ -17,10 +17,12 @@ async function main() {
   console.log('1. Yeni Twitter hesabı ekle (manuel)');
   console.log('2. Popüler hesaplardan ekle');
   console.log('3. Toplu hesap ekle (kategori bazında)');
-  console.log('4. Rastgele 10 popüler hesap ekle');
-  console.log('5. Hesapları listele');
-  console.log('6. Hesap durumunu değiştir (aktif/pasif)');
-  console.log('7. Çıkış\n');
+  console.log('4. ⚡ Multi hesap ekle (paralel) - YENİ!');
+  console.log('5. Rastgele 10 popüler hesap ekle');
+  console.log('6. TÜM HESAPLARI EKLE (tüm kategoriler)');
+  console.log('7. Hesapları listele');
+  console.log('8. Hesap durumunu değiştir (aktif/pasif)');
+  console.log('9. Çıkış\n');
   
   const choice = await question('Seçiminiz: ');
   
@@ -90,6 +92,54 @@ async function main() {
       break;
       
     case '4':
+      console.log('\n⚡ Multi Hesap Ekleme (Paralel)\n');
+      console.log('1. Kategori seç');
+      console.log('2. Rastgele hesaplar');
+      console.log('3. Tüm hesaplar');
+      
+      const multiChoice = await question('\nSeçiminiz: ');
+      let accountsToAdd = [];
+      
+      if (multiChoice === '1') {
+        console.log('\n📋 Kategoriler:\n');
+        Object.keys(popularAccounts).forEach((cat, idx) => {
+          console.log(`${idx + 1}. ${cat} (${popularAccounts[cat].length} hesap)`);
+        });
+        
+        const multiCatChoice = await question('\nKategori numarası: ');
+        const multiCatIdx = parseInt(multiCatChoice) - 1;
+        const multiCategories = Object.keys(popularAccounts);
+        
+        if (multiCatIdx >= 0 && multiCatIdx < multiCategories.length) {
+          const category = multiCategories[multiCatIdx];
+          accountsToAdd = popularAccounts[category];
+        }
+      } else if (multiChoice === '2') {
+        const count = await question('Kaç hesap eklensin? (varsayılan: 10): ');
+        const numAccounts = parseInt(count) || 10;
+        accountsToAdd = getRandomAccounts(numAccounts);
+      } else if (multiChoice === '3') {
+        accountsToAdd = allAccounts;
+        console.log(`\n⚠️  DİKKAT: ${allAccounts.length} hesap eklenecek!`);
+        const confirmAll = await question('Devam etmek istiyor musunuz? (evet/hayir): ');
+        if (confirmAll.toLowerCase() !== 'evet' && confirmAll.toLowerCase() !== 'e') {
+          console.log('❌ İşlem iptal edildi.');
+          break;
+        }
+      }
+      
+      if (accountsToAdd.length > 0) {
+        const batchSize = await question(`Paralel işlem sayısı (varsayılan: 5): `);
+        const batch = parseInt(batchSize) || 5;
+        
+        const delayMs = await question(`Batch'ler arası bekleme (ms, varsayılan: 2000): `);
+        const delay = parseInt(delayMs) || 2000;
+        
+        await accountManager.addMultipleAccounts(accountsToAdd, true, batch, delay);
+      }
+      break;
+      
+    case '5':
       const randomAccounts = getRandomAccounts(10);
       console.log('\n🎲 Rastgele 10 hesap ekleniyor...\n');
       
@@ -101,7 +151,40 @@ async function main() {
       console.log('\n✅ Rastgele hesaplar eklendi!');
       break;
       
-    case '5':
+    case '6':
+      console.log('\n⚠️  DİKKAT: Tüm kategorilerdeki BÜTÜN hesaplar eklenecek!\n');
+      console.log(`📊 Toplam ${allAccounts.length} hesap bulundu.\n`);
+      
+      const confirm = await question('Devam etmek istiyor musunuz? (evet/hayir): ');
+      
+      if (confirm.toLowerCase() === 'evet' || confirm.toLowerCase() === 'e') {
+        console.log('\n🔄 Tüm hesaplar ekleniyor...\n');
+        
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (let i = 0; i < allAccounts.length; i++) {
+          const acc = allAccounts[i];
+          console.log(`\n[${i + 1}/${allAccounts.length}] @${acc} ekleniyor...`);
+          
+          try {
+            await accountManager.addTwitterAccount(acc, true);
+            successCount++;
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          } catch (error) {
+            console.error(`❌ Hata: ${error.message}`);
+            errorCount++;
+          }
+        }
+        
+        console.log('\n✅ İşlem tamamlandı!');
+        console.log(`📊 Başarılı: ${successCount}, Hatalı: ${errorCount}`);
+      } else {
+        console.log('❌ İşlem iptal edildi.');
+      }
+      break;
+      
+    case '7':
       const accounts = await accountManager.loadAccounts();
       console.log('\n📋 Kayıtlı Hesaplar:\n');
       accounts.forEach((acc, index) => {
@@ -116,24 +199,24 @@ async function main() {
       });
       break;
       
-    case '6':
-      const allAccounts = await accountManager.loadAccounts();
+    case '8':
+      const loadedAccounts = await accountManager.loadAccounts();
       console.log('\n📋 Hesaplar:\n');
-      allAccounts.forEach((acc, index) => {
+      loadedAccounts.forEach((acc, index) => {
         console.log(`${index + 1}. @${acc.twitterUsername} - ${acc.enabled ? 'Aktif' : 'Pasif'}`);
       });
       
       const accountIndex = await question('\nHesap numarası: ');
       const idx = parseInt(accountIndex) - 1;
       
-      if (idx >= 0 && idx < allAccounts.length) {
-        allAccounts[idx].enabled = !allAccounts[idx].enabled;
-        await accountManager.saveAccounts(allAccounts);
-        console.log(`✅ ${allAccounts[idx].twitterUsername} ${allAccounts[idx].enabled ? 'aktif' : 'pasif'} edildi`);
+      if (idx >= 0 && idx < loadedAccounts.length) {
+        loadedAccounts[idx].enabled = !loadedAccounts[idx].enabled;
+        await accountManager.saveAccounts(loadedAccounts);
+        console.log(`✅ ${loadedAccounts[idx].twitterUsername} ${loadedAccounts[idx].enabled ? 'aktif' : 'pasif'} edildi`);
       }
       break;
       
-    case '7':
+    case '9':
       console.log('👋 Çıkılıyor...');
       rl.close();
       return;

@@ -269,6 +269,98 @@ class AccountManager {
     return newAccount;
   }
 
+  async addMultipleAccounts(twitterUsernames, autoRegister = true, batchSize = 5, delayMs = 2000) {
+    console.log(`\n🚀 Toplu Hesap Ekleme Başlatılıyor...`);
+    console.log(`👥 Toplam Hesap: ${twitterUsernames.length}`);
+    console.log(`🔄 Paralel İşlem: ${batchSize} hesap/batch`);
+    console.log(`⏱️  Batch'ler arası bekleme: ${delayMs}ms\n`);
+    console.log('─'.repeat(60) + '\n');
+
+    const results = {
+      success: [],
+      failed: [],
+      skipped: [],
+      political: []
+    };
+
+    // Batch'lere böl
+    const batches = [];
+    for (let i = 0; i < twitterUsernames.length; i += batchSize) {
+      batches.push(twitterUsernames.slice(i, i + batchSize));
+    }
+
+    console.log(`📦 Toplam ${batches.length} batch oluşturuldu\n`);
+
+    // Her batch'i işle
+    for (let i = 0; i < batches.length; i++) {
+      const batchNumber = i + 1;
+      console.log(`\n🔄 Batch ${batchNumber}/${batches.length} işleniyor...`);
+      
+      const batchPromises = batches[i].map(async (username, index) => {
+        const globalIndex = (batchNumber - 1) * batchSize + index + 1;
+        console.log(`\n[${globalIndex}/${twitterUsernames.length}] ${username}`);
+        
+        try {
+          const result = await this.addTwitterAccount(username, autoRegister);
+          
+          if (result === null) {
+            // Politik veya zaten var
+            const accounts = await this.loadAccounts();
+            const existing = accounts.find(acc => acc.twitterUsername === username);
+            
+            if (existing) {
+              results.skipped.push(username);
+            } else {
+              results.political.push(username);
+            }
+          } else {
+            results.success.push(username);
+          }
+        } catch (error) {
+          console.error(`❌ ${username}: ${error.message}`);
+          results.failed.push({ username, error: error.message });
+        }
+      });
+
+      await Promise.all(batchPromises);
+      
+      console.log(`\n✅ Batch ${batchNumber} tamamlandı!`);
+
+      // Son batch değilse bekle
+      if (i < batches.length - 1) {
+        console.log(`⏳ ${delayMs}ms bekleniyor...\n`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+
+    // Özet rapor
+    console.log('\n' + '─'.repeat(60));
+    console.log('\n📊 ÖZET:');
+    console.log(`✅ Başarılı: ${results.success.length}`);
+    console.log(`❌ Başarısız: ${results.failed.length}`);
+    console.log(`⏭️  Atlanan (zaten var): ${results.skipped.length}`);
+    console.log(`🚫 Politik: ${results.political.length}`);
+    console.log(`📈 Toplam: ${twitterUsernames.length}`);
+    console.log(`🎯 Başarı Oranı: ${((results.success.length / twitterUsernames.length) * 100).toFixed(1)}%`);
+
+    if (results.success.length > 0) {
+      console.log(`\n✅ Başarılı hesaplar:`);
+      results.success.forEach(u => console.log(`   - ${u}`));
+    }
+
+    if (results.failed.length > 0) {
+      console.log(`\n❌ Başarısız hesaplar:`);
+      results.failed.forEach(f => console.log(`   - ${f.username}: ${f.error}`));
+    }
+
+    if (results.political.length > 0) {
+      console.log(`\n🚫 Politik hesaplar (eklenmedi):`);
+      results.political.forEach(u => console.log(`   - ${u}`));
+    }
+
+    return results;
+  }
+
   async getActiveAccounts() {
     const accounts = await this.loadAccounts();
     return accounts.filter(acc => 
